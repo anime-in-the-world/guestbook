@@ -44,10 +44,7 @@ export async function signUpWithEmail(email: string, password: string, username:
                 name: validation.sanitized!,
                 username: validation.sanitized!,
             },
-            headers: {
-                'x-captcha-response': captchaToken,
-            }
-        });
+            });
 
         return { data: result, error: null };
     } catch (error: any) {

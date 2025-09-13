@@ -6,9 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Mail, Lock, User, AlertCircle } from 'lucide-react';
 import { validateUsername } from '@/lib/username-validation';
 import { signUpWithEmail } from '@/actions/auth';
-import { Turnstile } from '@marsidev/react-turnstile';
-import type { TurnstileInstance } from '@marsidev/react-turnstile';
-
 interface AuthFormProps {
   onSuccess?: () => void;
 }
@@ -20,12 +17,7 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [usernameError, setUsernameError] = useState('');
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  const [showCaptcha, setShowCaptcha] = useState(false);
-  const turnstileRef = useRef<TurnstileInstance | null>(null);
-
-  const handleUsernameChange = (value: string) => {
+  const [usernameError, setUsernameError] = useState('');const handleUsernameChange = (value: string) => {
     setUsername(value);
     setUsernameError('');
 
@@ -41,18 +33,6 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
     e.preventDefault();
     setError('');
     setUsernameError('');
-
-    // Show captcha on first submit attempt
-    if (!showCaptcha) {
-      setShowCaptcha(true);
-      return;
-    }
-
-    // If captcha is shown but no token, wait for captcha completion
-    if (showCaptcha && !captchaToken) {
-      setError('Please complete the captcha');
-      return;
-    }
 
     setIsLoading(true);
 
@@ -70,12 +50,8 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
       if (error) {
         setError(error.message || 'Something went wrong');
         setIsLoading(false);
-        // Hide captcha and reset for next attempt
-        setShowCaptcha(false);
-        setCaptchaToken(null);
-        turnstileRef.current?.reset();
-        return;
-      }
+return;
+}
     } else {
       const usernameValidation = validateUsername(username);
       if (!usernameValidation.isValid) {
@@ -94,12 +70,8 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
       if (signUpResult.error) {
         setError(signUpResult.error);
         setIsLoading(false);
-        // Hide captcha and reset for next attempt
-        setShowCaptcha(false);
-        setCaptchaToken(null);
-        turnstileRef.current?.reset();
-        return;
-      }
+return;
+}
 
 
       const { error: signInError } = await authClient.signIn.email({
@@ -115,21 +87,12 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
       if (signInError) {
         setError(signInError.message || 'Something went wrong');
         setIsLoading(false);
-        // Hide captcha and reset for next attempt
-        setShowCaptcha(false);
-        setCaptchaToken(null);
-        turnstileRef.current?.reset();
-        return;
-      }
+return;
+}
     }
 
     onSuccess?.();
-    setIsLoading(false);
-    // Hide captcha after successful submission
-    setShowCaptcha(false);
-    setCaptchaToken(null);
-    turnstileRef.current?.reset();
-  };
+    setIsLoading(false);};
 
 
   return (
@@ -242,39 +205,7 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
             </div>
           </>
 
-        {showCaptcha && (
-          <div className="flex flex-col items-center gap-2 my-4">
-            <Turnstile
-              key={`turnstile-${isLogin ? 'login' : 'signup'}`}
-              ref={turnstileRef}
-              siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
-              onSuccess={(token) => {
-                setCaptchaToken(token);
-                setError(''); // Clear any previous errors when captcha is verified
-                // Auto-submit the form once captcha is verified
-                setTimeout(() => {
-                  const form = document.querySelector('form');
-                  if (form) {
-                    form.requestSubmit();
-                  }
-                }, 100);
-              }}
-              onExpire={() => {
-                setCaptchaToken(null);
-              }}
-              onError={() => {
-                setCaptchaToken(null);
-              }}
-              options={{
-                theme: 'dark',
-                refreshExpired: 'auto',
-                appearance: 'always'
-              }}
-            />
-            {captchaToken && (
-              <p className="text-xs text-green-500">✓ Captcha verified</p>
-            )}
-          </div>
+        </div>
         )}
 
         <div className="pt-2">

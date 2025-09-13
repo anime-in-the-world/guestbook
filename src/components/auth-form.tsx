@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { authClient } from '@/lib/auth-client';
 import { Button } from '@/components/ui/button';
 import { Mail, Lock, User, AlertCircle } from 'lucide-react';
 import { validateUsername } from '@/lib/username-validation';
 import { signUpWithEmail } from '@/actions/auth';
+
 interface AuthFormProps {
   onSuccess?: () => void;
 }
@@ -15,214 +16,155 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [usernameError, setUsernameError] = useState('');const handleUsernameChange = (value: string) => {
-    setUsername(value);
-    setUsernameError('');
+  const [usernameError, setUsernameError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-    if (!isLogin && value.length > 0) {
-      const validation = validateUsername(value);
-      if (!validation.isValid) {
-        setUsernameError(validation.error!);
-      }
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     setUsernameError('');
-
     setIsLoading(true);
 
-    if (isLogin) {
-      const { error } = await authClient.signIn.email({
-        email,
-        password,
-        fetchOptions: {
-          headers: {
-            'x-captcha-response': captchaToken || '',
-          },
-        },
-      });
+    try {
+      if (isLogin) {
+        const { error: signInError } = await authClient.signIn.email({
+          email,
+          password,
+        });
 
-      if (error) {
-        setError(error.message || 'Something went wrong');
-        setIsLoading(false);
-return;
-}
-    } else {
-      const usernameValidation = validateUsername(username);
-      if (!usernameValidation.isValid) {
-        setUsernameError(usernameValidation.error!);
-        setIsLoading(false);
-        return;
+        if (signInError) {
+          setError(signInError.message || 'Something went wrong');
+          setIsLoading(false);
+          return;
+        }
+      } else {
+        // validate username on client
+        const usernameValidation = validateUsername(username);
+        if (!usernameValidation.isValid) {
+          setUsernameError(usernameValidation.error || 'Invalid username');
+          setIsLoading(false);
+          return;
+        }
+
+        const { error: signUpError } = await signUpWithEmail(
+          email,
+          password,
+          usernameValidation.sanitized!
+        );
+        if (signUpError) {
+          setError(signUpError || 'Something went wrong');
+          setIsLoading(false);
+          return;
+        }
       }
 
-      const signUpResult = await signUpWithEmail(
-        email,
-        password,
-        usernameValidation.sanitized!,
-        captchaToken || '',
-      );
-
-      if (signUpResult.error) {
-        setError(signUpResult.error);
-        setIsLoading(false);
-return;
-}
-
-
-      const { error: signInError } = await authClient.signIn.email({
-        email,
-        password,
-        fetchOptions: {
-          headers: {
-            'x-captcha-response': captchaToken || '',
-          },
-        },
-      });
-
-      if (signInError) {
-        setError(signInError.message || 'Something went wrong');
-        setIsLoading(false);
-return;
-}
+      onSuccess?.();
+    } catch (err: any) {
+      setError(err?.message || 'Unexpected error');
+    } finally {
+      setIsLoading(false);
     }
-
-    onSuccess?.();
-    setIsLoading(false);};
-
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex rounded-lg bg-white/5 border border-white/10 p-1">
-          <button
-            onClick={() => {
-              setIsLogin(true);
-              setError('');
-              setUsernameError('');
-              setShowCaptcha(false);
-              setCaptchaToken(null);
-            }}
-            className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-all ${
-              isLogin
-                ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/25'
-                : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
-            }`}
-          >
-            Sign In
-          </button>
-          <button
-            onClick={() => {
-              setIsLogin(false);
-              setError('');
-              setUsernameError('');
-              setShowCaptcha(false);
-              setCaptchaToken(null);
-            }}
-            className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-all ${
-              !isLogin
-                ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/25'
-                : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
-            }`}
-          >
-            Sign Up
-          </button>
-        </div>
+        <button
+          onClick={() => {
+            setIsLogin(true);
+            setError('');
+            setUsernameError('');
+          }}
+          className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-all ${
+            isLogin
+              ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/25'
+              : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+          }`}
+          type="button"
+        >
+          Sign In
+        </button>
+        <button
+          onClick={() => {
+            setIsLogin(false);
+            setError('');
+            setUsernameError('');
+          }}
+          className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-all ${
+            !isLogin
+              ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/25'
+              : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+          }`}
+          type="button"
+        >
+          Create Account
+        </button>
+      </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {error && (
-          <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-lg text-sm flex items-center gap-2">
-            <AlertCircle className="w-4 h-4" />
-            {error}
+      {error && (
+        <div className="flex items-center gap-2 text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg p-3">
+          <AlertCircle className="h-4 w-4" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {!isLogin && (
+          <div className="space-y-2">
+            <label className="text-sm text-muted-foreground">Username</label>
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="yourname"
+                className="w-full pl-10 pr-3 py-2 rounded-md bg-white/5 border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary/50"
+              />
+            </div>
+            {usernameError && (
+              <p className="text-xs text-red-400">{usernameError}</p>
+            )}
           </div>
         )}
 
-        <>
-            <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium text-foreground flex items-center gap-2">
-                <Mail className="w-4 h-4 text-muted-foreground" />
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2.5 bg-white/10 border border-input rounded-lg shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all text-foreground"
-                placeholder="you@example.com"
-                required
-                disabled={isLoading}
-              />
-            </div>
-
-            {!isLogin && (
-              <div className="space-y-2">
-                <label htmlFor="username" className="text-sm font-medium text-foreground flex items-center gap-2">
-                  <User className="w-4 h-4 text-muted-foreground" />
-                  Username
-                </label>
-                <input
-                  id="username"
-                  type="text"
-                  value={username}
-                  onChange={(e) => handleUsernameChange(e.target.value)}
-                  className={`w-full px-4 py-2.5 bg-white/10 border rounded-lg shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 transition-all text-foreground ${
-                    usernameError
-                      ? 'border-destructive focus:ring-destructive/30 focus:border-destructive'
-                      : 'border-input focus:ring-primary/30 focus:border-primary'
-                  }`}
-                  placeholder="username"
-                  required
-                  disabled={isLoading}
-                />
-                {usernameError && (
-                  <p className="text-sm text-destructive flex items-center gap-1 mt-1">
-                    <AlertCircle className="w-3 h-3" />
-                    {usernameError}
-                  </p>
-                )}
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium text-foreground flex items-center gap-2">
-                <Lock className="w-4 h-4 text-muted-foreground" />
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2.5 bg-white/10 border border-input rounded-lg shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all text-foreground"
-                placeholder="••••••••"
-                required
-                disabled={isLoading}
-              />
-            </div>
-          </>
-
+        <div className="space-y-2">
+          <label className="text-sm text-muted-foreground">Email</label>
+          <div className="relative">
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              className="w-full pl-10 pr-3 py-2 rounded-md bg-white/5 border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary/50"
+            />
+          </div>
         </div>
-        )}
+
+        <div className="space-y-2">
+          <label className="text-sm text-muted-foreground">Password</label>
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full pl-10 pr-3 py-2 rounded-md bg-white/5 border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary/50"
+            />
+          </div>
+        </div>
 
         <div className="pt-2">
           <Button
             type="submit"
             disabled={isLoading}
             size="lg"
-            className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/25"
+            className="w-full"
           >
-          {isLoading ? (
-            <>
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-white mr-2" />
-              {isLogin ? 'Signing in...' : 'Creating account...'}
-            </>
-          ) : (
-            isLogin ? 'Sign In' : 'Create Account'
-          )}
+            {isLoading ? (isLogin ? 'Signing in...' : 'Creating account...') : (isLogin ? 'Sign In' : 'Create Account')}
           </Button>
         </div>
       </form>
